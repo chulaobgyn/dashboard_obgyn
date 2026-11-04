@@ -401,7 +401,7 @@ document.addEventListener("visibilitychange",()=>{
 const state = {
   tab: store.get("tab","today"), mine: store.get("mine",false),
   day:null, rfOpen:false, month:null, slot:store.get("slot","staff"), shiftPast:false,
-  evCat:"conf", evPast:false, ugTeam:"all", ugKind:"all", ugPast:false
+  evCat:"conf", evPast:false, ugYear:"all", ugTeam:"all", ugKind:"all", ugPast:false
 };
 
 /* ======================= people ======================= */
@@ -455,13 +455,15 @@ function evRow(e, showKind){
       ${sub.length?`<span class="sub">${sub.join(" · ")}</span>`:""}
       ${e.link?`<span>${linkBtn(e.link)}</span>`:""}</div></div>`;
 }
+const teamLabel = t => t==="all" ? "ทุกสาย" : "สาย "+esc(t);
+const ugKindLabel = u => u.invig ? "คุมสอบ" : u.kind==="exam" ? "สอบ" : "เรียน";
 function ugRow(u){
-  const sub=[`สาย ${esc(u.team)}`];
+  const sub=[teamLabel(u.team)];
   if(u.teachers && u.teachers.length) sub.push(namesShort(u.teachers));
   if(u.location) sub.push(esc(u.location));
   return `<div class="row" role="button" tabindex="0" data-open="${u.id}" style="--tc:var(--t-ug)">
     <span class="dot"></span><span class="tm">${timeHTML(u)}</span>
-    <div class="body"><span class="kind">${u.kind==="exam"?"สอบ":"เรียน"}${u.year?" · ปี "+esc(u.year):""}</span><span class="ttl">${esc(u.title)}</span><span class="sub">${sub.join(" · ")}</span></div></div>`;
+    <div class="body"><span class="kind">ปี ${esc(u.year)} · ${ugKindLabel(u)}${u.type&&u.kind!=="exam"?" · "+esc(u.type):""}</span><span class="ttl">${esc(u.title)}</span><span class="sub">${sub.join(" · ")}</span></div></div>`;
 }
 const isHolidayOrWeekend = d => { const w=dow(d); return w===0||w===6||!!holidayOn(d); };
 const shiftTime = d => isHolidayOrWeekend(d) ? "08:00 – 08:00" : "16:00 – 08:00";
@@ -577,12 +579,13 @@ function renderEvents(){
 /* ======================= นิสิต ======================= */
 function renderUG(){
   if(!UG.length){ $("v-ug").innerHTML=`<div class="empty" style="margin-top:14px">ยังไม่ได้เชื่อมตารางนิสิต</div>`; return; }
-  let list=UG.filter(u=>(state.ugTeam==="all"||u.team===state.ugTeam||u.team==="all") && (state.ugKind==="all"||u.kind===state.ugKind));
+  let list=UG.filter(u=>(state.ugYear==="all"||String(u.year)===state.ugYear) && (state.ugTeam==="all"||u.team===state.ugTeam||u.team==="all") && (state.ugKind==="all"||u.kind===state.ugKind));
   if(state.mine) list=list.filter(u=>(u.teachers||[]).some(tokenHasMe));
   const hiddenPast=state.ugPast?0:list.filter(u=>u.date<TODAY).length;
   if(!state.ugPast) list=list.filter(u=>u.date>=TODAY);
   const chipRow=(label,key,opts)=>`<div class="flabel">${label}</div><div class="chips" role="group" aria-label="${label}">${opts.map(([k,l])=>`<button class="chip" type="button" data-ug="${key}:${k}" aria-pressed="${state[key]===k}">${l}</button>`).join("")}</div>`;
   $("v-ug").innerHTML=`
+    ${chipRow("ชั้นปี","ugYear",[["all","ทุกชั้นปี"],["4","ปี 4"],["6","ปี 6"]])}
     ${chipRow("สาย","ugTeam",[["all","ทุกสาย"],["1","สาย 1"],["2","สาย 2"],["3","สาย 3"],["4","สาย 4"],["5","สาย 5"]])}
     ${chipRow("ประเภท","ugKind",[["all","ทั้งหมด"],["lesson","เรียน"],["exam","สอบ"]])}
     ${hiddenPast?`<button class="pastbtn" type="button" data-past="ugPast">แสดงที่ผ่านมา (${hiddenPast})</button>`:""}
@@ -624,8 +627,9 @@ function openEvent(id){
   const facts=[["วันที่", multi?`${dShort(e.date,true)} – ${dShort(e.endDate,true)}`:dLong(e.date)],
                ["เวลา", e.start?`<span class="num">${esc(e.start)}${e.end?" – "+esc(e.end):""} น.</span>`:"ทั้งวัน"]];
   if(isUg){
-    facts.push(["สาย / ปี",`สาย ${esc(e.team)}${e.year?" · ปี "+esc(e.year):""}`]);
-    if(e.teachers&&e.teachers.length) facts.push(["อาจารย์",e.teachers.map(personLine).join("")]);
+    facts.push(["ชั้นปี / สาย",`ปี ${esc(e.year)} · ${teamLabel(e.team)}`]);
+    if(e.type && e.kind!=="exam") facts.push(["รูปแบบ",esc(e.type)]);
+    if(e.teachers&&e.teachers.length) facts.push([e.invig?`ผู้คุมสอบ (${e.teachers.length})`:"อาจารย์",e.teachers.map(personLine).join("")]);
   }else{
     const staff=[],res=[],fel=[];
     e.people.forEach(t=>{ const p=person(t); (p&&p.r==="r"?res:p&&p.r==="f"?fel:staff).push(t); });

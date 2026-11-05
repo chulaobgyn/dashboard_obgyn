@@ -499,7 +499,7 @@ function renderToday(){
     <div class="jump" role="navigation" aria-label="ไปยังหัวข้อ">${jump.map(([id,l,c])=>`<button class="chip" type="button" data-jump="${id}">${l} <span class="ct num">${c}</span></button>`).join("")}</div>
     ${hol?`<button class="holiday" type="button" data-open="${hol.id}">${esc(hol.title)}${hol.notes?`<small>${esc(hol.notes)}</small>`:""}</button>`:""}
     <div class="sec" id="sec-shift"><h2>อาจารย์เวร <small>${WD_FULL[dow(d)]}</small></h2>
-      ${!s||!s[0]?`<div class="empty">ยังไม่มีตารางเวรของวันนี้</div>`:
+      ${!s?`<div class="empty">ยังไม่มีตารางเวรของวันนี้</div>`:!s[0]?`<div class="empty">ยังไม่มีชื่ออาจารย์เวรของวันนี้${rfCount?" (เวรแพทย์ประจำบ้าน / Fellow อยู่ด้านล่าง)":""}</div>`:
         showStaff?`<div class="row" role="button" tabindex="0" data-roster="${d}" style="--tc:var(--t-shift)"><span class="dot"></span>
           <div class="body"><span class="ttl" style="font-size:1.15rem">${nm(s[0])}</span><span class="sub">${shiftTime(d)} น. · แตะเพื่อดูเวรทั้งหมด</span></div>${ICON.right}</div>`
         :`<div class="empty">คุณไม่ได้อยู่เวรวันนี้ (อาจารย์เวร: ${esc(s[0])})</div>`}

@@ -248,9 +248,10 @@ const SLOTS = ["อาจารย์","OB 1","OB 2","OB 3","GYN 1","GYN 2","GYN
 const OB = [1,2,3], GYN = [4,5,6], FEL = [7,8,9,10,11,12];
 const CAT = {
   conf:{label:"ประชุมวิชาการ",color:"var(--t-conf)"}, meet:{label:"ประชุม",color:"var(--t-meet)"},
-  pg:{label:"กิจกรรม post grad",color:"var(--t-pg)"}, misc:{label:"อื่นๆ",color:"var(--t-misc)"}
+  pg:{label:"กิจกรรม post grad",color:"var(--t-pg)"}, misc:{label:"อื่นๆ",color:"var(--t-misc)"},
+  all:{label:"ทั้งหมด",color:"var(--t-misc)"} // chip only; events never have cat "all"
 };
-const EV_TABS = ["conf","meet","pg","misc"];
+const EV_TABS = ["all","conf","meet","pg","misc"];
 const WD_SHORT = ["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."];
 const WD_FULL = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
 const MON_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
@@ -566,14 +567,14 @@ function renderShifts(){
 
 /* ======================= กิจกรรม ======================= */
 function renderEvents(){
-  let list=EVENTS.filter(e=>e.cat===state.evCat);
+  let list=state.evCat==="all"?EVENTS.slice():EVENTS.filter(e=>e.cat===state.evCat);
   if(state.mine) list=list.filter(involvesMe);
   const hiddenPast=state.evPast?0:list.filter(e=>e.endDate<TODAY).length;
   if(!state.evPast) list=list.filter(e=>e.endDate>=TODAY);
   $("v-events").innerHTML=`
     <div class="chips" role="group" aria-label="ประเภทกิจกรรม">${EV_TABS.map(k=>`<button class="chip" type="button" data-evcat="${k}" aria-pressed="${state.evCat===k}">${CAT[k].label}</button>`).join("")}</div>
     ${hiddenPast?`<button class="pastbtn" type="button" data-past="evPast">แสดงที่ผ่านมา (${hiddenPast})</button>`:""}
-    ${list.length?groupByDate(list,e=>evRow(e,state.evCat==="misc")):`<div class="empty">${state.mine?"ไม่มีรายการของคุณ":"ไม่มีรายการ"}</div>`}`;
+    ${list.length?groupByDate(list,e=>evRow(e,state.evCat==="misc"||state.evCat==="all")):`<div class="empty">${state.mine?"ไม่มีรายการของคุณ":"ไม่มีรายการ"}</div>`}`;
 }
 
 /* ======================= นิสิต ======================= */

@@ -101,6 +101,8 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 .dhead .tag{font-size:.75rem;background:#fff;border-radius:var(--r);padding:0 7px;font-weight:700}
 .d0{background:#F8D0CF;color:#7A2826}.d1{background:#FFF2B3;color:#6B5800}.d2{background:#F9D3E6;color:#7A2350}
 .d3{background:#D4EDC9;color:#2F5A1F}.d4{background:#FFDDB5;color:#7A4310}.d5{background:#CFE2F3;color:#1F4A70}.d6{background:#E1D5F0;color:#4B3478}
+/* เวร list: two colours only (Yam 05/11/2026) */
+.srow .dbox.dwork{background:#EFEAE5;color:#3A3330}.srow .dbox.doff{background:#F8D0CF;color:#7A2826}
 
 /* roster */
 .rf-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-weight:600}
@@ -126,7 +128,9 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 
 /* links */
 .lrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.lrow .body{flex:1;min-width:0}
 .lrow .body .ttl{color:var(--accent-text)}
+.lrow .lkind{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:.82rem;color:var(--accent-text);border:1px solid var(--accent-text);border-radius:var(--r);padding:2px 8px;white-space:nowrap}
 
 /* bottom tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:#fff;border-top:1px solid #D9D0C6;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -150,6 +154,9 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 .person{display:block}
 .person small{color:var(--muted);font-size:.85rem}
 .sheet .zoom{font-size:1rem;padding:8px 18px;background:var(--accent-text);color:#fff;margin-top:16px}
+.facts .zoom{margin-top:0}
+.facts .url{display:block;margin-top:6px;font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.pre{white-space:pre-wrap}
 .note{background:var(--soft);padding:10px 12px;margin-top:12px;font-size:.95rem;white-space:pre-wrap}
 
 /* login / status pages */
@@ -183,27 +190,15 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
   <div class="hint" id="ios-hint" hidden>แนะนำ: กดปุ่มแชร์ <b>⎙</b> แล้วเลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b> ก่อน แล้วเข้าสู่ระบบจากไอคอนบนหน้าจอโฮม (ถ้าเข้าสู่ระบบใน Safari จะต้องเข้าสู่ระบบอีกครั้งในไอคอน)</div>
   <div id="step-email">
     <h2>เข้าสู่ระบบ</h2>
-    <p>ใส่อีเมลที่แจ้งไว้กับภาควิชา ระบบจะส่งรหัส 6 หลักไปทางอีเมล</p>
+    <p>ใส่อีเมลที่แจ้งไว้กับภาควิชา และรหัสภาควิชา (ทำครั้งเดียวต่อเครื่อง)</p>
     <form id="f-email" novalidate target="_self">
       <label class="field" for="email">อีเมล</label>
       <input class="input" id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="name@gmail.com">
+      <label class="field" for="pass">รหัสภาควิชา</label>
+      <input class="input" id="pass" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       <div class="err" id="err-email" role="alert"></div>
-      <button class="btn primary" type="submit" id="b-email">ส่งรหัสทางอีเมล</button>
+      <button class="btn primary" type="submit" id="b-email">เข้าสู่ระบบ</button>
     </form>
-  </div>
-  <div id="step-code" hidden>
-    <h2>ใส่รหัสจากอีเมล</h2>
-    <p>ส่งรหัสไปที่ <b id="sent-to"></b> แล้ว (ถ้าไม่เห็น ให้ดูในจดหมายขยะ) รหัสใช้ได้ 10 นาที</p>
-    <form id="f-code" novalidate target="_self">
-      <label class="field" for="code">รหัส 6 หลัก</label>
-      <input class="input code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*">
-      <div class="err" id="err-code" role="alert"></div>
-      <button class="btn primary" type="submit" id="b-code">เข้าสู่ระบบ</button>
-    </form>
-    <div class="links-line">
-      <button class="linkbtn" type="button" id="b-resend">ขอรหัสใหม่</button>
-      <button class="linkbtn" type="button" id="b-change">เปลี่ยนอีเมล</button>
-    </div>
   </div>
 </section>
 
@@ -318,45 +313,29 @@ function show(id){ ["login","status","app"].forEach(x=>$(x).hidden = x!==id); }
 function status(text, retry){ show("status"); $("status-text").textContent=text; $("b-retry").hidden=!retry; }
 
 /* ======================= login ======================= */
-let loginEmail = "";
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 const isStandalone = window.navigator.standalone===true || matchMedia("(display-mode: standalone)").matches;
 function showLogin(msg){
-  show("login"); $("ios-hint").hidden = !(isIOS && !isStandalone); $("step-email").hidden=false; $("step-code").hidden=true;
+  show("login"); $("ios-hint").hidden = !(isIOS && !isStandalone);
   $("err-email").textContent = msg || "";
-  $("email").value = loginEmail || store.get("email","");
+  $("email").value = store.get("email","");
 }
-async function sendCode(){
-  const email=$("email").value.trim();
-  $("err-email").textContent=""; $("err-code").textContent="";
+/* Email + department passcode (Yam 05/11/2026, replaces the emailed 6-digit code). */
+async function doLogin(){
+  const email=$("email").value.trim(), pass=$("pass").value.trim();
+  $("err-email").textContent="";
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ $("err-email").textContent="อีเมลไม่ถูกต้อง กรุณาตรวจสอบ (ต้องมี @ เช่น name@gmail.com)"; return; }
-  $("b-email").disabled=true; $("b-resend").disabled=true; $("b-email").textContent="กำลังส่ง…";
+  if(!pass){ $("err-email").textContent="ไม่พบรหัสภาควิชา กรุณาใส่รหัสภาควิชา"; return; }
+  $("b-email").disabled=true; $("b-email").textContent="กำลังตรวจสอบ…";
   try{
-    const res=await call("requestCode", email);
-    if(res.error){ ($("step-code").hidden?$("err-email"):$("err-code")).textContent=res.error; return; }
-    loginEmail=email; store.set("email",email);
-    $("sent-to").textContent=email; $("step-email").hidden=true; $("step-code").hidden=false;
-    $("code").value=""; $("code").focus();
-  }catch(e){ $("err-email").textContent="เชื่อมต่อไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่"; }
-  finally{ $("b-email").disabled=false; $("b-resend").disabled=false; $("b-email").textContent="ส่งรหัสทางอีเมล"; }
-}
-async function checkCode(){
-  const code=$("code").value.replace(/\D/g,"");
-  $("err-code").textContent="";
-  if(code.length!==6){ $("err-code").textContent="กรุณาใส่รหัส 6 หลักจากอีเมล"; return; }
-  $("b-code").disabled=true; $("b-code").textContent="กำลังตรวจสอบ…";
-  try{
-    const res=await call("verifyCode", loginEmail, code);
-    if(res.error){ $("err-code").textContent=res.error; return; }
+    const res=await call("login", email, pass);
+    if(res.error){ $("err-email").textContent=res.error; return; }
+    store.set("email",email); $("pass").value="";
     setToken(res.token); load();
-  }catch(e){ $("err-code").textContent="เชื่อมต่อไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่"; }
-  finally{ $("b-code").disabled=false; $("b-code").textContent="เข้าสู่ระบบ"; }
+  }catch(e){ $("err-email").textContent="เชื่อมต่อไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่"; }
+  finally{ $("b-email").disabled=false; $("b-email").textContent="เข้าสู่ระบบ"; }
 }
-$("f-email").addEventListener("submit",e=>{ e.preventDefault(); sendCode(); });
-$("f-code").addEventListener("submit",e=>{ e.preventDefault(); checkCode(); });
-$("code").addEventListener("input",()=>{ if($("code").value.replace(/\D/g,"").length===6) checkCode(); });
-$("b-resend").addEventListener("click",()=>{ $("email").value=loginEmail; sendCode(); });
-$("b-change").addEventListener("click",()=>showLogin());
+$("f-email").addEventListener("submit",e=>{ e.preventDefault(); doLogin(); });
 $("b-retry").addEventListener("click",()=>load());
 
 /* ======================= data ======================= */
@@ -439,8 +418,26 @@ function timeHTML(e){
   return `<b class="num">${esc(e.start)}</b>${e.end?`<span class="num">${esc(e.end)}</span>`:""}`;
 }
 const isZoom = u => /zoom\./i.test(u||"");
+/* What a link opens, so people know before tapping (Yam 05/11/2026). */
+function linkKind(u){
+  u=String(u||"").toLowerCase();
+  if(/zoom\./.test(u)) return "Zoom";
+  if(/teams\.microsoft|teams\.live/.test(u)) return "Teams";
+  if(/meet\.google/.test(u)) return "Google Meet";
+  if(/dropbox\./.test(u)) return "Dropbox";
+  if(/docs\.google\.com\/spreadsheets/.test(u)) return "Google Sheets";
+  if(/docs\.google\.com\/presentation/.test(u)) return "Google Slides";
+  if(/docs\.google\.com\/forms|forms\.gle/.test(u)) return "Google Form";
+  if(/docs\.google\.com/.test(u)) return "Google Docs";
+  if(/drive\.google/.test(u)) return "Google Drive";
+  if(/sharepoint\.com|onedrive|1drv\.ms/.test(u)) return "OneDrive";
+  if(/youtube\.com|youtu\.be/.test(u)) return "YouTube";
+  if(/\.pdf(\?|#|$)/.test(u)) return "PDF";
+  return "เว็บไซต์";
+}
 function linkBtn(u){
-  return `<a class="zoom" href="${esc(u)}" target="_blank" rel="noopener">${isZoom(u)?ICON.video+"เข้า Zoom":ICON.ext+"เปิดลิงก์"}</a>`;
+  const k=linkKind(u);
+  return `<a class="zoom" href="${esc(u)}" target="_blank" rel="noopener">${k==="Zoom"?ICON.video+"เข้า Zoom":ICON.ext+"เปิด "+k}</a>`;
 }
 function evRow(e, showKind){
   const c=CAT[e.cat]||CAT.misc;
@@ -559,7 +556,7 @@ function renderShifts(){
     ${hiddenPast?`<button class="pastbtn" type="button" data-past="shiftPast">แสดงวันที่ผ่านมา (${hiddenPast} วัน)</button>`:""}
     <div style="margin-top:6px">
     ${days.length?days.map(d=>{const w=dow(d),h=holidayOn(d);return `<div class="srow ${d<TODAY?"past":""} ${d===TODAY?"today":""}" role="button" tabindex="0" data-roster="${d}">
-        <span class="dbox d${w}"><b class="num">${Number(d.slice(8))}</b><span>${WD_SHORT[w]}</span></span>
+        <span class="dbox ${isHolidayOrWeekend(d)?"doff":"dwork"}"><b class="num">${Number(d.slice(8))}</b><span>${WD_SHORT[w]}</span></span>
         <span class="nm">${cell(d)}${h?`<span class="flag">${esc(h.title)}</span>`:""}</span>${ICON.right}</div>`}).join("")
       :`<div class="empty">${!anyThisMonth?"ยังไม่มีตารางเวรเดือนนี้":state.mine?"ไม่มีเวรของคุณในช่วงนี้":"ไม่มีเวรที่เหลือในเดือนนี้"}</div>`}
     </div>`;
@@ -600,7 +597,7 @@ function renderLinks(){
   $("v-links").innerHTML=`
     <div class="sec"><h2>ลิงก์ที่ใช้บ่อย</h2></div>
     ${groups.length?groups.map(([c,ls])=>`<div class="sec"><h2>${esc(c)}</h2>${ls.map(l=>`<a class="lrow" href="${esc(l.u)}" target="_blank" rel="noopener">
-      <div class="body"><span class="ttl">${esc(l.n)}</span>${l.t?`<span class="sub">${esc(l.t)}</span>`:""}</div>${isZoom(l.u)?ICON.video:ICON.ext}</a>`).join("")}</div>`).join("")
+      <div class="body"><span class="ttl">${esc(l.n)}</span>${l.t?`<span class="sub">${esc(l.t)}</span>`:""}</div><span class="lkind">${isZoom(l.u)?ICON.video:ICON.ext}${esc(linkKind(l.u))}</span></a>`).join("")}</div>`).join("")
       :`<div class="empty">ยังไม่มีลิงก์</div>`}
     <div class="foot">
       <span>ข้อมูลล่าสุด ${esc(D.built?D.built.slice(8,10)+"/"+D.built.slice(5,7)+"/"+D.built.slice(0,4)+" "+D.built.slice(11):"")}</span>
@@ -640,11 +637,12 @@ function openEvent(id){
     if(e.speaker) facts.push(["วิทยากรภายนอก",esc(e.speaker)]);
   }
   if(e.location) facts.push(["สถานที่",esc(e.location)]);
+  if(e.link) facts.push([linkKind(e.link)==="Zoom"?"ลิงก์ Zoom":"ลิงก์",`${linkBtn(e.link)}<a class="url" href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a>`]);
+  if(e.notes) facts.push(["หมายเหตุ",`<span class="pre">${esc(e.notes)}</span>`]);
   openSheet(`<div class="shead"><div><span class="typel" style="--tc:${c.color}"><span class="dot"></span>${esc(isUg?c.label:e.type)}</span>
       <h3 id="sheet-title">${esc(e.title)}</h3></div>${closeBtn}</div>
     <dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
-    ${e.notes?`<div class="note">${esc(e.notes)}</div>`:""}
-    ${e.link?linkBtn(e.link):""}`);
+`);
 }
 function openRoster(d){
   const s=shiftOf(d); if(!s) return; const h=holidayOn(d);

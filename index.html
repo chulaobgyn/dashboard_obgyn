@@ -190,17 +190,25 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 .mgrid td.hol .mmain{display:flex;align-items:center;justify-content:center;color:var(--t-hol);font-weight:700;font-size:1.05em;background:#FBEAEA;cursor:pointer}
 .mspan{background:#F1ECF7;color:#4B3478;text-align:center;padding:4px;font-weight:600;cursor:pointer}
 .printhead{display:none}
+/* Print = always ONE A4 landscape page (Yam 06/11/2026). html.pmode is added just before printing:
+   it lays the table out at the printable width (281mm ≈ 1062px), then fitPrint_() lowers the font size
+   (--pfs) until it fits the printable height (194mm ≈ 733px). Font size, not CSS zoom: Chrome paginates
+   zoomed content wrongly. */
+html.pmode{font-size:var(--pfs,13px) !important}
+html.pmode .mfit{width:1062px}
+html.pmode .printhead{display:block;text-align:center;font-weight:700;font-size:1.1rem;margin:0 0 6px}
+html.pmode .mscroll{overflow:visible;margin:0;padding:0}
+html.pmode .mgrid{min-width:0}
+html.pmode .mgrid td.day{height:5em}
+html.pmode .mgrid td.today{outline:0}
+html.pmode .mgrid td.today .mdn span{background:none;color:inherit;padding:0}
+html.pmode .me{background:none !important;color:inherit !important;padding:0 !important}
 @media print{
   @page{size:A4 landscape;margin:8mm}
-  html{font-size:13px !important}
+  html,body{margin:0;padding:0}
   .band,.userbar,.tabs,.offline,.noprint{display:none !important}
-  #app.wide .wrap{max-width:none;padding:0}
-  .printhead{display:block;text-align:center;font-weight:700;font-size:1.1rem;margin:0 0 6px}
-  .mscroll{overflow:visible;margin:0;padding:0}
-  .mgrid{min-width:0}
-  .mgrid td.day{height:5.5em}
-  .mgrid td.today{outline:0}.mgrid td.today .mdn span{background:none;color:inherit;padding:0}
-  .me{background:none !important;color:inherit !important;padding:0 !important}
+  #app .wrap{max-width:none !important;padding:0 !important;margin:0}
+  .mgrid,.mgrid tr{break-inside:avoid;page-break-inside:avoid}
   .mgrid th,.mgrid .wk,.mgrid td.out,.mgrid td.hol .mmain,.mspan,.msub i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 
@@ -393,6 +401,10 @@ function useData(data, me){
   if(!state.month) state.month=TODAY.slice(0,7);
   if(!state.evMonth) state.evMonth=TODAY.slice(0,7);
   $("who").innerHTML=esc(ME);
+  // ผู้ดูแลตาราง (view-only admins) aren't in the schedule, so "เฉพาะของฉัน" would always be empty for them.
+  const inSchedule=!!D.people[ME];
+  $("mine").hidden=!inSchedule;
+  if(!inSchedule) state.mine=false;
   show("app"); render();
 }
 async function load(){
@@ -693,8 +705,8 @@ function monthGrid(list){
     });
   }
   return `<div class="mtools noprint"><span class="mhint">เลื่อนตารางไปทางซ้าย-ขวาได้ หรือหมุนโทรศัพท์เป็นแนวนอน</span><button class="btn small" type="button" id="b-print">พิมพ์</button></div>
-    <p class="printhead">ภาควิชาสูติศาสตร์-นรีเวชวิทยา · ตารางกิจกรรมประจำเดือน ${MON_FULL[m-1]} ${y}</p>
-    <div class="mscroll"><table class="mgrid"><thead><tr><th class="wk" aria-label="สัปดาห์ที่"></th>${cols.map(w=>`<th>${WD_FULL[w]}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="mfit-out"><div class="mfit"><p class="printhead">ภาควิชาสูติศาสตร์-นรีเวชวิทยา · ตารางกิจกรรมประจำเดือน ${MON_FULL[m-1]} ${y}</p>
+    <div class="mscroll"><table class="mgrid"><thead><tr><th class="wk" aria-label="สัปดาห์ที่"></th>${cols.map(w=>`<th>${WD_FULL[w]}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
 }
 
 /* ======================= นิสิต ======================= */
@@ -775,8 +787,30 @@ function openRoster(d){
 }
 
 /* ======================= wiring ======================= */
+/* One-page print: lay out at print width, then zoom down to fit the page height. Also runs when
+   printing from the browser menu / share sheet (beforeprint). */
+const PRINT_W=1062, PRINT_H=725; // px inside A4 landscape with 8mm margins (733px, minus a little slack)
+function fitPrint_(){
+  const out=document.querySelector(".mfit-out"); if(!out) return;
+  const root=document.documentElement;
+  root.classList.add("pmode");
+  // Largest font size (13px down to 6px, half-pixel steps) at which the month fits on the page.
+  let fs=13;
+  root.style.setProperty("--pfs",fs+"px");
+  while(fs>6 && out.getBoundingClientRect().height>PRINT_H){
+    fs-=0.5; root.style.setProperty("--pfs",fs+"px");
+  }
+}
+function unfitPrint_(){
+  document.documentElement.classList.remove("pmode");
+  document.documentElement.style.removeProperty("--pfs");
+}
+window.addEventListener("beforeprint",fitPrint_);
+window.addEventListener("afterprint",unfitPrint_);
+
 function render(){
   if(!D) return;
+  unfitPrint_(); // in case afterprint never fired (some phones)
   document.querySelectorAll("[data-view]").forEach(v=>v.hidden=v.dataset.view!==state.tab);
   document.querySelectorAll("[data-tab]").forEach(b=>b.dataset.tab===state.tab?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   $("mine").setAttribute("aria-pressed",state.mine);
@@ -797,7 +831,7 @@ function activate(t, ev){
   if(t.dataset.slot){ state.slot=t.dataset.slot; store.set("slot",state.slot); render(); return; }
   if(t.dataset.month){ const k=t.dataset.mkey; const [y,m]=state[k].split("-").map(Number); const d=new Date(y,m-1+Number(t.dataset.month),1); state[k]=d.getFullYear()+"-"+pad(d.getMonth()+1); render(); return; }
   if(t.dataset.evview){ state.evView=t.dataset.evview; store.set("evView",state.evView); render(); return; }
-  if(t.id==="b-print"){ window.print(); return; }
+  if(t.id==="b-print"){ fitPrint_(); window.print(); return; }
   if(t.dataset.evcat){ state.evCat=t.dataset.evcat; render(); return; }
   if(t.dataset.ug){ const [k,v]=t.dataset.ug.split(":"); state[k]=v; render(); return; }
   if(t.dataset.past){ state[t.dataset.past]=!state[t.dataset.past]; render(); return; }

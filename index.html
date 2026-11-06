@@ -62,13 +62,11 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 .linkbtn{color:var(--accent-text);font-weight:600;text-decoration:underline;text-underline-offset:3px;min-height:40px}
 .zoom{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border:1px solid var(--accent-text);color:var(--accent-text);border-radius:var(--r);padding:3px 12px;font-size:.88rem;font-weight:600}
 
-/* date bar + jump chips */
+/* date bar + chips */
 .datebar{display:flex;align-items:center;gap:8px;padding:12px 0 8px}
 .iconbtn{width:44px;height:44px;border:1px solid #CFC7C0;border-radius:var(--r);display:grid;place-items:center;flex:none;background:#fff}
 .datepick{flex:1;min-width:0;height:44px;position:relative;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.15rem;border:1px solid #CFC7C0;border-radius:var(--r)}
 .datepick input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
-.jump{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:6px 16px;margin:0 -16px;scrollbar-width:none;border-bottom:1px solid var(--line)}
-.jump::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid #CFC7C0;border-radius:var(--r);padding:4px 12px;font-size:.9rem;background:#fff;min-height:36px;display:inline-flex;align-items:center;gap:6px}
 .chip .ct{font-weight:700;color:var(--accent-text)}
 .chip[aria-pressed="true"]{background:var(--accent-text);border-color:var(--accent-text);color:#fff}
@@ -346,6 +344,7 @@ function useData(data, me){
   EVENTS=D.events||[]; UG=D.ug||[];
   if(!state.day) state.day=TODAY;
   if(!state.month) state.month=TODAY.slice(0,7);
+  if(!state.evMonth) state.evMonth=TODAY.slice(0,7);
   $("who").innerHTML=esc(ME);
   show("app"); render();
 }
@@ -381,7 +380,7 @@ document.addEventListener("visibilitychange",()=>{
 const state = {
   tab: store.get("tab","today"), mine: store.get("mine",false),
   day:null, rfOpen:false, month:null, slot:store.get("slot","staff"), shiftPast:false,
-  evCat:"all", evPast:false, ugYear:"all", ugTeam:"all", ugKind:"all", ugPast:false
+  evCat:"all", evMonth:null, evPast:false, ugYear:"all", ugTeam:"all", ugKind:"all", ugPast:false
 };
 
 /* ======================= people ======================= */
@@ -485,7 +484,6 @@ function renderToday(){
   const showRF = s && rfCount && (!state.mine || rf.includes(ME));
   if(showRF && state.mine && !state.rfOpen) state.rfOpen=true;
 
-  const jump=[["sec-shift","เวรอาจารย์",showStaff?1:0],["sec-events","กิจกรรม",evs.length],["sec-ug","นิสิต",ugs.length],["sec-rf","แพทย์ประจำบ้าน/Fellow",showRF?rfCount:0]];
   $("v-today").innerHTML=`
     <div class="datebar">
       <button class="iconbtn" type="button" data-day="-1" aria-label="วันก่อนหน้า">${ICON.left}</button>
@@ -493,7 +491,6 @@ function renderToday(){
       <button class="iconbtn" type="button" data-day="1" aria-label="วันถัดไป">${ICON.right}</button>
       <button class="btn" type="button" data-day="0" ${d===TODAY?"disabled":""}>วันนี้</button>
     </div>
-    <div class="jump" role="navigation" aria-label="ไปยังหัวข้อ">${jump.map(([id,l,c])=>`<button class="chip" type="button" data-jump="${id}">${l} <span class="ct num">${c}</span></button>`).join("")}</div>
     ${hol?`<button class="holiday" type="button" data-open="${hol.id}">${esc(hol.title)}${hol.notes?`<small>${esc(hol.notes)}</small>`:""}</button>`:""}
     <div class="sec" id="sec-shift"><h2>อาจารย์เวร <small>${WD_FULL[dow(d)]}</small></h2>
       ${!s?`<div class="empty">ยังไม่มีตารางเวรของวันนี้</div>`:!s[0]?`<div class="empty">ยังไม่มีชื่ออาจารย์เวรของวันนี้${rfCount?" (เวรแพทย์ประจำบ้าน / Fellow อยู่ด้านล่าง)":""}</div>`:
@@ -524,6 +521,21 @@ function rosterKV(s, withStaff){
     <h3>Fellow</h3>${rows(FEL)}</dl>`;
 }
 
+/* month navigation + show/hide-past button (shared by เวร and กิจกรรม) */
+function monthNav(key){
+  const [y,m]=state[key].split("-").map(Number);
+  return `<div class="monthnav">
+      <button class="iconbtn" type="button" data-month="-1" data-mkey="${key}" aria-label="เดือนก่อน">${ICON.left}</button>
+      <div class="m">${MON_FULL[m-1]} ${y}</div>
+      <button class="iconbtn" type="button" data-month="1" data-mkey="${key}" aria-label="เดือนถัดไป">${ICON.right}</button>
+    </div>`;
+}
+// Past rows are hidden only in the current month; other months show everything.
+function pastBtn(key, n, unit){
+  if(!n) return "";
+  return `<button class="pastbtn" type="button" data-past="${key}" aria-expanded="${!!state[key]}">${state[key]?"ซ่อนที่ผ่านมา":`แสดงที่ผ่านมา (${n}${unit||""})`}</button>`;
+}
+
 /* ======================= เวร ======================= */
 const SLOT_TABS=[["staff","อาจารย์",[0]],["ob","OB",OB],["gyn","GYN",GYN],["fellow","Fellow",FEL]];
 function renderShifts(){
@@ -532,8 +544,9 @@ function renderShifts(){
   let days=[];
   for(let i=1;i<=nDays;i++){ const d=`${y}-${pad(m)}-${pad(i)}`; if(shiftOf(d)) days.push(d); }
   if(state.mine) days=days.filter(d=>shiftHasMe(shiftOf(d)));
-  const hiddenPast=state.shiftPast?0:days.filter(d=>d<TODAY).length;
-  if(!state.shiftPast) days=days.filter(d=>d>=TODAY);
+  const isNow=state.month===TODAY.slice(0,7);
+  const nPast=isNow?days.filter(d=>d<TODAY).length:0;
+  if(nPast&&!state.shiftPast) days=days.filter(d=>d>=TODAY);
   const slotDef=SLOT_TABS.find(t=>t[0]===state.slot)||SLOT_TABS[0];
 
   const cell=d=>{
@@ -547,13 +560,9 @@ function renderShifts(){
   };
   const anyThisMonth=Object.keys(D.shifts).some(d=>d.startsWith(state.month));
   $("v-shifts").innerHTML=`
-    <div class="monthnav">
-      <button class="iconbtn" type="button" data-month="-1" aria-label="เดือนก่อน">${ICON.left}</button>
-      <div class="m">${MON_FULL[m-1]} ${y}</div>
-      <button class="iconbtn" type="button" data-month="1" aria-label="เดือนถัดไป">${ICON.right}</button>
-    </div>
+    ${monthNav("month")}
     ${state.mine?"":`<div class="chips" role="group" aria-label="ประเภทเวร">${SLOT_TABS.map(([k,l])=>`<button class="chip" type="button" data-slot="${k}" aria-pressed="${state.slot===k}">${l}</button>`).join("")}</div>`}
-    ${hiddenPast?`<button class="pastbtn" type="button" data-past="shiftPast">แสดงวันที่ผ่านมา (${hiddenPast} วัน)</button>`:""}
+    ${pastBtn("shiftPast",nPast," วัน")}
     <div style="margin-top:6px">
     ${days.length?days.map(d=>{const w=dow(d),h=holidayOn(d);return `<div class="srow ${d<TODAY?"past":""} ${d===TODAY?"today":""}" role="button" tabindex="0" data-roster="${d}">
         <span class="dbox ${isHolidayOrWeekend(d)?"doff":"dwork"}"><b class="num">${Number(d.slice(8))}</b><span>${WD_SHORT[w]}</span></span>
@@ -566,12 +575,17 @@ function renderShifts(){
 function renderEvents(){
   let list=state.evCat==="all"?EVENTS.slice():EVENTS.filter(e=>e.cat===state.evCat);
   if(state.mine) list=list.filter(involvesMe);
-  const hiddenPast=state.evPast?0:list.filter(e=>e.endDate<TODAY).length;
-  if(!state.evPast) list=list.filter(e=>e.endDate>=TODAY);
+  // events touching this month (a multi-day event shows in every month it covers)
+  const mFirst=state.evMonth+"-01", mLast=state.evMonth+"-31";
+  list=list.filter(e=>e.date<=mLast && e.endDate>=mFirst);
+  const isNow=state.evMonth===TODAY.slice(0,7);
+  const nPast=isNow?list.filter(e=>e.endDate<TODAY).length:0;
+  if(nPast&&!state.evPast) list=list.filter(e=>e.endDate>=TODAY);
   $("v-events").innerHTML=`
+    ${monthNav("evMonth")}
     <div class="chips" role="group" aria-label="ประเภทกิจกรรม">${EV_TABS.map(k=>`<button class="chip" type="button" data-evcat="${k}" aria-pressed="${state.evCat===k}">${CAT[k].label}</button>`).join("")}</div>
-    ${hiddenPast?`<button class="pastbtn" type="button" data-past="evPast">แสดงที่ผ่านมา (${hiddenPast})</button>`:""}
-    ${list.length?groupByDate(list,e=>evRow(e,state.evCat==="misc"||state.evCat==="all")):`<div class="empty">${state.mine?"ไม่มีรายการของคุณ":"ไม่มีรายการ"}</div>`}`;
+    ${pastBtn("evPast",nPast)}
+    ${list.length?groupByDate(list,e=>evRow(e,state.evCat==="misc"||state.evCat==="all")):`<div class="empty">${state.mine?"ไม่มีรายการของคุณในเดือนนี้":"ไม่มีรายการในเดือนนี้"}</div>`}`;
 }
 
 /* ======================= นิสิต ======================= */
@@ -579,14 +593,14 @@ function renderUG(){
   if(!UG.length){ $("v-ug").innerHTML=`<div class="empty" style="margin-top:14px">ยังไม่ได้เชื่อมตารางนิสิต</div>`; return; }
   let list=UG.filter(u=>(state.ugYear==="all"||String(u.year)===state.ugYear) && (state.ugTeam==="all"||u.team===state.ugTeam||u.team==="all") && (state.ugKind==="all"||u.kind===state.ugKind));
   if(state.mine) list=list.filter(u=>(u.teachers||[]).some(tokenHasMe));
-  const hiddenPast=state.ugPast?0:list.filter(u=>u.date<TODAY).length;
+  const nPast=list.filter(u=>u.date<TODAY).length;
   if(!state.ugPast) list=list.filter(u=>u.date>=TODAY);
   const chipRow=(label,key,opts)=>`<div class="flabel">${label}</div><div class="chips" role="group" aria-label="${label}">${opts.map(([k,l])=>`<button class="chip" type="button" data-ug="${key}:${k}" aria-pressed="${state[key]===k}">${l}</button>`).join("")}</div>`;
   $("v-ug").innerHTML=`
     ${chipRow("ชั้นปี","ugYear",[["all","ทุกชั้นปี"],["4","ปี 4"],["6","ปี 6"]])}
     ${chipRow("สาย","ugTeam",[["all","ทุกสาย"],["1","สาย 1"],["2","สาย 2"],["3","สาย 3"],["4","สาย 4"],["5","สาย 5"]])}
     ${chipRow("ประเภท","ugKind",[["all","ทั้งหมด"],["lesson","เรียน"],["exam","สอบ"]])}
-    ${hiddenPast?`<button class="pastbtn" type="button" data-past="ugPast">แสดงที่ผ่านมา (${hiddenPast})</button>`:""}
+    ${pastBtn("ugPast",nPast)}
     ${list.length?groupByDate(list,ugRow):`<div class="empty">${state.mine?"ไม่มีการสอนของคุณ":"ไม่มีรายการ"}</div>`}`;
 }
 
@@ -667,15 +681,14 @@ function activate(t, ev){
   if(t.id==="logout"){ call("endSession",getToken()).catch(()=>{}); setToken(null); store.del("data"); D=null; return showLogin(); }
   if(t.dataset.tab){ state.tab=t.dataset.tab; store.set("tab",state.tab); render(); window.scrollTo(0,0); return; }
   if(t.dataset.day!==undefined){ const n=Number(t.dataset.day); state.day=n===0?TODAY:addDays(state.day,n); state.rfOpen=false; render(); return; }
-  if(t.dataset.jump){ document.getElementById(t.dataset.jump)?.scrollIntoView(); return; }
   if(t.id==="rf-toggle"){ state.rfOpen=!state.rfOpen; render(); return; }
   if(t.dataset.roster){ openRoster(t.dataset.roster); return; }
   if(t.dataset.open){ openEvent(t.dataset.open); return; }
   if(t.dataset.slot){ state.slot=t.dataset.slot; store.set("slot",state.slot); render(); return; }
-  if(t.dataset.month){ const [y,m]=state.month.split("-").map(Number); const d=new Date(y,m-1+Number(t.dataset.month),1); state.month=d.getFullYear()+"-"+pad(d.getMonth()+1); state.shiftPast=true; render(); return; }
+  if(t.dataset.month){ const k=t.dataset.mkey; const [y,m]=state[k].split("-").map(Number); const d=new Date(y,m-1+Number(t.dataset.month),1); state[k]=d.getFullYear()+"-"+pad(d.getMonth()+1); render(); return; }
   if(t.dataset.evcat){ state.evCat=t.dataset.evcat; render(); return; }
   if(t.dataset.ug){ const [k,v]=t.dataset.ug.split(":"); state[k]=v; render(); return; }
-  if(t.dataset.past){ state[t.dataset.past]=true; render(); return; }
+  if(t.dataset.past){ state[t.dataset.past]=!state[t.dataset.past]; render(); return; }
 }
 document.addEventListener("click",e=>{
   if(e.target.id==="daypick"){ try{ e.target.showPicker(); }catch(_){} return; }

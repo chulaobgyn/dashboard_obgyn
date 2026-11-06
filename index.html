@@ -157,6 +157,53 @@ svg.i{width:1.15em;height:1.15em;flex:none;vertical-align:-.2em}
 .pre{white-space:pre-wrap}
 .note{background:var(--soft);padding:10px 12px;margin-top:12px;font-size:.95rem;white-space:pre-wrap}
 
+/* กิจกรรม: list / monthly table switch + monthly table like ตารางชมพู (06/11/2026) */
+.seg{display:flex;margin-top:12px;border:1px solid #CFC7C0;border-radius:var(--r);overflow:hidden;width:max-content;max-width:100%}
+.seg button{padding:0 16px;min-height:40px;font-size:.92rem;text-align:center}
+.seg button[aria-pressed="true"]{background:var(--accent-text);color:#fff;font-weight:600}
+#app.wide .wrap{max-width:1240px}
+.mtools{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.mhint{font-size:.82rem;color:var(--muted)}
+@media (min-width:900px){.mhint{visibility:hidden}}
+.mscroll{overflow-x:auto;margin:8px -16px 0;padding:0 16px 4px}
+.mgrid{width:100%;min-width:860px;border-collapse:collapse;table-layout:fixed;font-size:.78rem;line-height:1.3}
+.mgrid th{background:var(--accent-soft);color:var(--accent-text);font-weight:700;padding:6px 4px;border:1px solid #CFC7C0;font-size:.88rem}
+.mgrid .wk{width:30px;text-align:center;color:var(--muted);font-weight:400;font-size:.75rem;background:var(--soft)}
+.mgrid th.wk{background:var(--soft);color:var(--muted);font-weight:400}
+.mgrid td{border:1px solid #CFC7C0;vertical-align:top;padding:0}
+.mgrid td.day{height:7.5em}
+.mcell{display:flex;flex-direction:column;height:100%}
+.mdn{font-weight:700;padding:3px 6px 0;font-size:.9rem}
+.mgrid td.today{outline:2px solid var(--accent-text);outline-offset:-2px}
+.mgrid td.today .mdn span{background:var(--accent-text);color:#fff;border-radius:var(--r);padding:0 6px}
+.mgrid td.out{background:var(--soft)}
+.mgrid td.out .mdn{color:#C4BCB7;font-weight:400}
+.mmain{padding:2px 6px 6px;text-align:center;flex:1}
+.mmain .mev{display:block;padding:2px;border-radius:2px;cursor:pointer}
+.mkind{display:block;color:var(--accent-text);font-size:.92em}
+.mttl{display:block;font-weight:700;font-size:1.12em;margin:2px 0;overflow-wrap:anywhere}
+.mppl{display:block}
+.mmuted{display:block;color:var(--muted);font-size:.92em}
+.msub{display:block;padding:3px 6px;border-top:1px solid var(--line);text-align:center;cursor:pointer;overflow-wrap:anywhere}
+.msub i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;background:var(--tc)}
+.mmain .mev:hover,.msub:hover{background:var(--accent-soft)}
+.mgrid td.hol .mmain{display:flex;align-items:center;justify-content:center;color:var(--t-hol);font-weight:700;font-size:1.05em;background:#FBEAEA;cursor:pointer}
+.mspan{background:#F1ECF7;color:#4B3478;text-align:center;padding:4px;font-weight:600;cursor:pointer}
+.printhead{display:none}
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  html{font-size:13px !important}
+  .band,.userbar,.tabs,.offline,.noprint{display:none !important}
+  #app.wide .wrap{max-width:none;padding:0}
+  .printhead{display:block;text-align:center;font-weight:700;font-size:1.1rem;margin:0 0 6px}
+  .mscroll{overflow:visible;margin:0;padding:0}
+  .mgrid{min-width:0}
+  .mgrid td.day{height:5.5em}
+  .mgrid td.today{outline:0}.mgrid td.today .mdn span{background:none;color:inherit;padding:0}
+  .me{background:none !important;color:inherit !important;padding:0 !important}
+  .mgrid th,.mgrid .wk,.mgrid td.out,.mgrid td.hol .mmain,.mspan,.msub i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
 /* login / status pages */
 .page{max-width:440px;margin:0 auto;padding:28px 16px}
 .page h2{font-size:1.25rem;margin:0 0 6px}
@@ -380,7 +427,7 @@ document.addEventListener("visibilitychange",()=>{
 const state = {
   tab: store.get("tab","today"), mine: store.get("mine",false),
   day:null, rfOpen:false, month:null, slot:store.get("slot","staff"), shiftPast:false,
-  evCat:"all", evMonth:null, evPast:false, ugYear:"all", ugTeam:"all", ugKind:"all", ugPast:false
+  evCat:"all", evView:store.get("evView","list"), evMonth:null, evPast:false, ugYear:"all", ugTeam:"all", ugKind:"all", ugPast:false
 };
 
 /* ======================= people ======================= */
@@ -580,12 +627,74 @@ function renderEvents(){
   list=list.filter(e=>e.date<=mLast && e.endDate>=mFirst);
   const isNow=state.evMonth===TODAY.slice(0,7);
   const nPast=isNow?list.filter(e=>e.endDate<TODAY).length:0;
+  const seg=`<div class="seg noprint" role="group" aria-label="มุมมอง">${[["list","รายการ"],["grid","ตารางรายเดือน"]].map(([k,l])=>`<button type="button" data-evview="${k}" aria-pressed="${state.evView===k}">${l}</button>`).join("")}</div>`;
+  const chips=`<div class="chips noprint" role="group" aria-label="ประเภทกิจกรรม">${EV_TABS.map(k=>`<button class="chip" type="button" data-evcat="${k}" aria-pressed="${state.evCat===k}">${CAT[k].label}</button>`).join("")}</div>`;
+  if(state.evView==="grid"){ // whole month, past days included
+    $("v-events").innerHTML=`${seg}<div class="noprint">${monthNav("evMonth")}</div>${chips}${monthGrid(list)}`;
+    return;
+  }
   if(nPast&&!state.evPast) list=list.filter(e=>e.endDate>=TODAY);
   $("v-events").innerHTML=`
+    ${seg}
     ${monthNav("evMonth")}
-    <div class="chips" role="group" aria-label="ประเภทกิจกรรม">${EV_TABS.map(k=>`<button class="chip" type="button" data-evcat="${k}" aria-pressed="${state.evCat===k}">${CAT[k].label}</button>`).join("")}</div>
+    ${chips}
     ${pastBtn("evPast",nPast)}
     ${list.length?groupByDate(list,e=>evRow(e,state.evCat==="misc"||state.evCat==="all")):`<div class="empty">${state.mine?"ไม่มีรายการของคุณในเดือนนี้":"ไม่มีรายการในเดือนนี้"}</div>`}`;
+}
+
+/* Monthly table like the paper ตารางชมพู (Yam 06/11/2026): Mon–Fri columns, one row per week.
+   Headline = the day's ประชุมวิชาการ; everything else in a strip below; holidays fill the cell;
+   multi-day events as a bar under their week. Sat/Sun columns appear only if something falls on them. */
+function monthGrid(list){
+  const [y,m]=state.evMonth.split("-").map(Number);
+  const first=new Date(y,m-1,1), last=new Date(y,m,0);
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const single=list.filter(e=>!e.hol && (!e.endDate||e.endDate===e.date));
+  const multi=list.filter(e=>!e.hol && e.endDate && e.endDate!==e.date);
+  const weekendUsed=single.some(e=>{const w=parse(e.date).getDay(); return w===0||w===6;});
+  const nCols=weekendUsed?7:5;
+  const cols=[1,2,3,4,5,6,0].slice(0,nCols);
+  const mev=e=>{
+    let i=e.title.indexOf(" – ");
+    if(i>0 && !/^(Topic Review|Lecture)/i.test(e.title)) i=-1; // "Topic Review: F2 – topic" → label + topic
+    const kind=i>0?e.title.slice(0,i):"", ttl=i>0?e.title.slice(i+3):e.title;
+    const tm=e.start?`${esc(e.start)}${e.end?"–"+esc(e.end):""} น.`:"ทั้งวัน";
+    return `<span class="mev" role="button" tabindex="0" data-open="${e.id}">
+      <span class="mkind num">${tm}${kind?" · "+esc(kind):""}</span>
+      <span class="mttl">${esc(ttl)}</span>
+      ${e.people.length?`<span class="mppl">${e.people.map(nm).join(", ")}</span>`:""}
+      ${e.speaker?`<span class="mppl">${esc(e.speaker)}</span>`:""}
+      ${e.notes?`<span class="mmuted">${esc(e.notes)}</span>`:""}
+      ${e.location?`<span class="mmuted">${esc(e.location)}</span>`:""}</span>`;
+  };
+  const msub=e=>`<span class="msub" role="button" tabindex="0" data-open="${e.id}" style="--tc:${(CAT[e.cat]||CAT.misc).color}"><i></i>${e.start?`<b class="num">${esc(e.start)} น.</b> `:""}${esc(e.title)}${e.people.length?" · "+namesShort(e.people,3):""}</span>`;
+  const cell=d=>{
+    const ds=iso(d), inM=d.getMonth()===m-1;
+    const dn=`<div class="mdn num"><span>${d.getDate()}</span></div>`;
+    const cls=["day",inM?"":"out",ds===TODAY?"today":""];
+    if(!inM) return `<td class="${cls.join(" ")}"><div class="mcell">${dn}</div></td>`;
+    const hol=holidayOn(ds);
+    if(hol) return `<td class="${cls.join(" ")} hol"><div class="mcell">${dn}<div class="mmain" role="button" tabindex="0" data-open="${hol.id}">${esc(hol.title)}</div></div></td>`;
+    const evs=single.filter(e=>e.date===ds).sort(byTime);
+    const main=evs.find(e=>e.cat==="conf");
+    const rest=evs.filter(e=>e!==main);
+    return `<td class="${cls.join(" ")}"><div class="mcell">${dn}<div class="mmain">${main?mev(main):""}</div>${rest.map(msub).join("")}</div></td>`;
+  };
+  let rows="", wk=0;
+  const start=new Date(first); start.setDate(1-((first.getDay()+6)%7)); // Monday on/before the 1st
+  for(let d=new Date(start); d<=last; d.setDate(d.getDate()+7)){
+    const days=cols.map(w=>{const x=new Date(d); x.setDate(d.getDate()+((w+6)%7)); return x;});
+    if(!days.some(x=>x.getMonth()===m-1)) continue;
+    wk++;
+    rows+=`<tr><td class="wk num">${wk}</td>${days.map(cell).join("")}</tr>`;
+    const ws=iso(d), we=iso(new Date(d.getFullYear(),d.getMonth(),d.getDate()+6));
+    multi.filter(e=>e.date<=we && e.endDate>=ws).forEach(e=>{
+      rows+=`<tr><td class="wk"></td><td colspan="${nCols}" class="mspan" role="button" tabindex="0" data-open="${e.id}">${esc(e.title)} · <span class="num">${dShort(e.date)} – ${dShort(e.endDate)}</span></td></tr>`;
+    });
+  }
+  return `<div class="mtools noprint"><span class="mhint">เลื่อนตารางไปทางซ้าย-ขวาได้ หรือหมุนโทรศัพท์เป็นแนวนอน</span><button class="btn small" type="button" id="b-print">พิมพ์</button></div>
+    <p class="printhead">ภาควิชาสูติศาสตร์-นรีเวชวิทยา · ตารางกิจกรรมประจำเดือน ${MON_FULL[m-1]} ${y}</p>
+    <div class="mscroll"><table class="mgrid"><thead><tr><th class="wk" aria-label="สัปดาห์ที่"></th>${cols.map(w=>`<th>${WD_FULL[w]}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ======================= นิสิต ======================= */
@@ -672,6 +781,7 @@ function render(){
   document.querySelectorAll("[data-tab]").forEach(b=>b.dataset.tab===state.tab?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   $("mine").setAttribute("aria-pressed",state.mine);
   $("userbar").hidden = state.tab==="links";
+  $("app").classList.toggle("wide", state.tab==="events" && state.evView==="grid");
   ({today:renderToday,shifts:renderShifts,events:renderEvents,ug:renderUG,links:renderLinks})[state.tab]();
 }
 $("mine").addEventListener("click",()=>{ state.mine=!state.mine; store.set("mine",state.mine); state.rfOpen=false; render(); });
@@ -686,6 +796,8 @@ function activate(t, ev){
   if(t.dataset.open){ openEvent(t.dataset.open); return; }
   if(t.dataset.slot){ state.slot=t.dataset.slot; store.set("slot",state.slot); render(); return; }
   if(t.dataset.month){ const k=t.dataset.mkey; const [y,m]=state[k].split("-").map(Number); const d=new Date(y,m-1+Number(t.dataset.month),1); state[k]=d.getFullYear()+"-"+pad(d.getMonth()+1); render(); return; }
+  if(t.dataset.evview){ state.evView=t.dataset.evview; store.set("evView",state.evView); render(); return; }
+  if(t.id==="b-print"){ window.print(); return; }
   if(t.dataset.evcat){ state.evCat=t.dataset.evcat; render(); return; }
   if(t.dataset.ug){ const [k,v]=t.dataset.ug.split(":"); state[k]=v; render(); return; }
   if(t.dataset.past){ state[t.dataset.past]=!state[t.dataset.past]; render(); return; }
